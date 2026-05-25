@@ -8,6 +8,13 @@ const nodeBuiltins = [
 ];
 
 export default defineConfig({
+  // Node.js 環境向けに ws の "node" エントリを解決させる。
+  // 既定だと ws の package.json の browser フィールドが優先されてしまい、
+  // 拡張ロード時に config.browser.WebSocketServer など壊れた参照になる。
+  resolve: {
+    conditions: ["node", "import", "module", "default"],
+    mainFields: ["main", "module"],
+  },
   build: {
     target: "node20",
     outDir: "dist",
@@ -23,14 +30,10 @@ export default defineConfig({
       fileName: (_format, entryName) => `${entryName}.js`,
     },
     rollupOptions: {
-      external: [
-        "vscode",
-        "ws",
-        "@modelcontextprotocol/sdk",
-        /^@modelcontextprotocol\/sdk\//,
-        "zod",
-        ...nodeBuiltins,
-      ],
+      // vscode のみ拡張ホスト側で提供されるので external。
+      // ws / @modelcontextprotocol/sdk / zod は extension.js / mcp.js に
+      // 同梱しないと .vsix インストール先で node_modules が無く load 失敗する。
+      external: ["vscode", ...nodeBuiltins],
       output: {
         exports: "named",
       },
