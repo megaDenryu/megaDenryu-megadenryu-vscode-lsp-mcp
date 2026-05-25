@@ -74,6 +74,13 @@ const getDocumentStateSchema = z.object({
   includeText: z.boolean().default(false),
 });
 
+const renameFileSchema = z.object({
+  oldPath: z.string(),
+  newPath: z.string(),
+  overwrite: z.boolean().default(false),
+  syncPathAttribute: z.boolean().default(true),
+});
+
 const tools: Tool[] = [
   {
     name: "rename_symbol",
@@ -218,6 +225,29 @@ const tools: Tool[] = [
       required: ["file"],
     },
   },
+  {
+    name: "rename_file",
+    description:
+      "ファイルをリネーム。VSCode の WorkspaceEdit.renameFile + applyEdit 経由で LSP の workspace/willRenameFiles を発火させ、rust-analyzer 等が participate して mod 宣言 / use 文を自動更新する。rename_symbol で mod 識別子の rename が動かないケースの代替経路。syncPathAttribute=true (既定) なら #[path = \"X.rs\"] 属性も同時書き換え。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        oldPath: { type: "string", description: "元ファイル絶対パス" },
+        newPath: { type: "string", description: "新ファイル絶対パス" },
+        overwrite: {
+          type: "boolean",
+          description: "新ファイルが既存なら上書きするか (既定 false)",
+          default: false,
+        },
+        syncPathAttribute: {
+          type: "boolean",
+          description: "Rust 全ファイルの #[path] 属性も新ファイル名で同期書き換え (既定 true)",
+          default: true,
+        },
+      },
+      required: ["oldPath", "newPath"],
+    },
+  },
 ];
 
 const server = new Server(
@@ -278,6 +308,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case "get_document_state": {
         const parsed = getDocumentStateSchema.parse(args);
         const result = await client.呼び出し("getDocumentState", parsed);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      case "rename_file": {
+        const parsed = renameFileSchema.parse(args);
+        const result = await client.呼び出し("renameFile", parsed);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       default:

@@ -23,6 +23,7 @@ import {
   listCommandsを処理,
   saveAllDirtyを処理,
 } from "./診断と状態";
+import { renameFileを処理 } from "./ファイルrename";
 
 let サーバー: WebSocketServer | undefined;
 let 出力チャンネル: vscode.OutputChannel | undefined;
@@ -113,6 +114,14 @@ async function リクエスト処理(req: RpcRequest): Promise<RpcResponse> {
           id: req.id,
           result: await getDocumentStateを処理(
             (req as RpcRequest<Extract<Request, { method: "getDocumentState" }>>).params,
+          ),
+        };
+      case "renameFile":
+        return {
+          jsonrpc: "2.0",
+          id: req.id,
+          result: await renameFileを処理(
+            (req as RpcRequest<Extract<Request, { method: "renameFile" }>>).params,
           ),
         };
       default:

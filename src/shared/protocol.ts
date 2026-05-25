@@ -94,6 +94,20 @@ export type GetDocumentStateRequest = {
   params: { file: string; includeText?: boolean };
 };
 
+export type RenameFileRequest = {
+  method: "renameFile";
+  // VSCode の WorkspaceEdit.renameFile 経由でファイル名変更。
+  // LSP の willRenameFiles participation が起動し、rust-analyzer 等が
+  // mod 宣言や use 文を自動更新する仕様。
+  // syncPathAttribute=true なら同時に #[path = "old.rs"] も new.rs に書き換える
+  params: {
+    oldPath: string;
+    newPath: string;
+    overwrite?: boolean;
+    syncPathAttribute?: boolean;
+  };
+};
+
 export type Request =
   | RenameSymbolRequest
   | FindSymbolRequest
@@ -104,7 +118,8 @@ export type Request =
   | ExecuteCommandRequest
   | GetWorkspaceStatusRequest
   | SaveAllDirtyRequest
-  | GetDocumentStateRequest;
+  | GetDocumentStateRequest
+  | RenameFileRequest;
 
 // ===== レスポンス型 =====
 
@@ -211,6 +226,17 @@ export type DocumentState = {
   text: string | null; // includeText=false なら null
 };
 
+export type RenameFileResult = {
+  applied: boolean;
+  // 事前/事後 dirty 比較で「LSP participation が走って書き換えたファイル」を観測
+  observedSideEffects: {
+    dirtyAfter: string[]; // 事後に dirty 化したファイル一覧 (= LSP が変更した可能性高)
+    fileExistsNow: { oldPath: boolean; newPath: boolean }; // rename が成功したか
+  };
+  pathAttributeUpdatesAdded: number; // syncPathAttribute=true で追加注入した数
+  warnings: string[];
+};
+
 export type ResultMap = {
   renameSymbol: RenameSymbolResult;
   findSymbol: FindSymbolResult;
@@ -222,6 +248,7 @@ export type ResultMap = {
   getWorkspaceStatus: WorkspaceStatus;
   saveAllDirty: SaveAllDirtyResult;
   getDocumentState: DocumentState;
+  renameFile: RenameFileResult;
 };
 
 // ===== JSON-RPC 風エンベロープ =====
