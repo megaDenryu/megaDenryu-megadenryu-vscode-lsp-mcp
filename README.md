@@ -25,14 +25,32 @@ VSCode 拡張内に MCP server を立ち上げ、VSCode が抱える LSP (rust-a
 
 両方とも **Vite library mode** (CJS) でビルドする。
 
-## 提供 MCP ツール (MVP)
+## 提供 MCP ツール
+
+### LSP 系
 
 | ツール名 | 役割 | 内部 VSCode API |
 |---|---|---|
-| `rename_symbol` | シンボルを rename し、cross-file / cross-crate の全参照を更新 | `vscode.executeDocumentRenameProvider` + `workspace.applyEdit` |
+| `rename_symbol` | シンボル rename + cross-file/cross-crate 全参照更新。識別子境界外の位置でも自動補正、mod 宣言なら `#[path]` 属性も同期 | `vscode.executeDocumentRenameProvider` + `prepareRename` + `workspace.applyEdit` |
 | `find_symbol` | workspace 内シンボル名検索 | `vscode.executeWorkspaceSymbolProvider` |
 | `find_referencing_symbols` | 指定位置のシンボルの参照箇所列挙 | `vscode.executeReferenceProvider` |
-| `ping` | 接続疎通確認 | (なし) |
+
+### 診断 / コマンド / 状態系 (セッション 6 で追加)
+
+| ツール名 | 役割 | 内部 VSCode API |
+|---|---|---|
+| `get_diagnostics(file?, severities?, limit?)` | Problems パネル相当 (rustc/rust-analyzer/tsserver 等の error/warning) | `vscode.languages.getDiagnostics` |
+| `list_commands(filter?, limit?)` | VSCode 全コマンド ID 一覧 | `vscode.commands.getCommands` |
+| `execute_command(commandId, args?)` | 任意 VSCode コマンドを実行 | `vscode.commands.executeCommand` |
+| `get_workspace_status()` | dirty 数 + git 変更 + problem 件数を集約 (= バッジ集約) | 上記 + git extension API |
+| `save_all_dirty(includeUntitled?)` | 全 dirty 文書を保存 | `vscode.workspace.saveAll` |
+| `get_document_state(file, includeText?)` | 個別ファイルの dirty + 内容取得 | `vscode.workspace.openTextDocument` |
+
+### 疎通確認
+
+| ツール名 | 役割 |
+|---|---|
+| `ping` | 接続疎通 + 拡張バージョン + workspace folder 取得 |
 
 ## セットアップ手順
 

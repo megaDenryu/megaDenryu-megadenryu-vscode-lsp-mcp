@@ -48,6 +48,32 @@ const findReferencingSymbolsSchema = z.object({
     .describe("true なら定義自体も結果に含める"),
 });
 
+const getDiagnosticsSchema = z.object({
+  file: z.string().optional(),
+  severities: z.array(z.enum(["error", "warning", "info", "hint"])).optional(),
+  limit: z.number().int().min(1).max(10000).default(500),
+});
+
+const listCommandsSchema = z.object({
+  filter: z.string().optional(),
+  limit: z.number().int().min(1).max(10000).default(1000),
+  includeInternal: z.boolean().default(false),
+});
+
+const executeCommandSchema = z.object({
+  commandId: z.string().min(1),
+  args: z.array(z.unknown()).optional(),
+});
+
+const saveAllDirtySchema = z.object({
+  includeUntitled: z.boolean().default(false),
+});
+
+const getDocumentStateSchema = z.object({
+  file: z.string(),
+  includeText: z.boolean().default(false),
+});
+
 const tools: Tool[] = [
   {
     name: "rename_symbol",
@@ -107,6 +133,91 @@ const tools: Tool[] = [
       "VSCode 拡張との接続疎通確認。拡張バージョンと workspace folder 一覧を返す。",
     inputSchema: { type: "object", properties: {} },
   },
+  {
+    name: "get_diagnostics",
+    description:
+      "VSCode の Problems パネル相当 (rustc / rust-analyzer / tsserver / eslint 等の error/warning) を取得。file 未指定で workspace 全体。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "対象ファイルの絶対パス。未指定で workspace 全体" },
+        severities: {
+          type: "array",
+          items: { type: "string", enum: ["error", "warning", "info", "hint"] },
+          description: "取得対象の重要度 (既定: 全部)",
+        },
+        limit: { type: "number", description: "件数上限 (既定 500)", default: 500 },
+      },
+    },
+  },
+  {
+    name: "list_commands",
+    description:
+      "VSCode の全コマンド ID を一覧。filter で部分文字列絞り込み可。組み込みコマンドが数千件あるので filter+limit 推奨。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        filter: { type: "string", description: "部分文字列 (大文字小文字無視)" },
+        limit: { type: "number", description: "上限 (既定 1000)", default: 1000 },
+        includeInternal: {
+          type: "boolean",
+          description: "_ で始まる内部コマンドも含める (既定 false)",
+          default: false,
+        },
+      },
+    },
+  },
+  {
+    name: "execute_command",
+    description:
+      "VSCode の任意のコマンドを実行。引数は JSON 配列。例: workbench.action.files.saveAll は args=[] / workbench.action.reloadWindow は args=[]",
+    inputSchema: {
+      type: "object",
+      properties: {
+        commandId: { type: "string", description: "VSCode コマンド ID" },
+        args: { type: "array", description: "コマンドへの引数配列", items: {} },
+      },
+      required: ["commandId"],
+    },
+  },
+  {
+    name: "get_workspace_status",
+    description:
+      "未保存文書数・git 変更数・問題件数を集約取得。エクスプローラー/ソース管理/問題タブのバッジ相当。Rename 後の遅延差分監視にも使える。",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "save_all_dirty",
+    description:
+      "全ての dirty な文書を保存 (vscode.workspace.saveAll)。保存できたファイル一覧を返す。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        includeUntitled: {
+          type: "boolean",
+          description: "Untitled (名前なし新規バッファ) も対象にするか (既定 false)",
+          default: false,
+        },
+      },
+    },
+  },
+  {
+    name: "get_document_state",
+    description:
+      "個別ファイルの dirty 状態 + 現在のテキスト (VSCode メモリ上、未保存変更込み) を取得。includeText=true で本文も返す。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "対象ファイルの絶対パス" },
+        includeText: {
+          type: "boolean",
+          description: "本文も含める (大きいファイルは要注意)",
+          default: false,
+        },
+      },
+      required: ["file"],
+    },
+  },
 ];
 
 const server = new Server(
@@ -138,6 +249,35 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case "find_referencing_symbols": {
         const parsed = findReferencingSymbolsSchema.parse(args);
         const result = await client.呼び出し("findReferencingSymbols", parsed);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      case "get_diagnostics": {
+        const parsed = getDiagnosticsSchema.parse(args);
+        const result = await client.呼び出し("getDiagnostics", parsed);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      case "list_commands": {
+        const parsed = listCommandsSchema.parse(args);
+        const result = await client.呼び出し("listCommands", parsed);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      case "execute_command": {
+        const parsed = executeCommandSchema.parse(args);
+        const result = await client.呼び出し("executeCommand", parsed);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      case "get_workspace_status": {
+        const result = await client.呼び出し("getWorkspaceStatus", {});
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      case "save_all_dirty": {
+        const parsed = saveAllDirtySchema.parse(args);
+        const result = await client.呼び出し("saveAllDirty", parsed);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+      case "get_document_state": {
+        const parsed = getDocumentStateSchema.parse(args);
+        const result = await client.呼び出し("getDocumentState", parsed);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
       default:

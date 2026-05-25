@@ -15,6 +15,14 @@ import {
   pingを処理,
   rename_symbolを処理,
 } from "./handlers";
+import {
+  executeCommandを処理,
+  getDiagnosticsを処理,
+  getDocumentStateを処理,
+  getWorkspaceStatusを処理,
+  listCommandsを処理,
+  saveAllDirtyを処理,
+} from "./診断と状態";
 
 let サーバー: WebSocketServer | undefined;
 let 出力チャンネル: vscode.OutputChannel | undefined;
@@ -59,6 +67,52 @@ async function リクエスト処理(req: RpcRequest): Promise<RpcResponse> {
           id: req.id,
           result: await find_referencing_symbolsを処理(
             (req as RpcRequest<Extract<Request, { method: "findReferencingSymbols" }>>).params,
+          ),
+        };
+      case "getDiagnostics":
+        return {
+          jsonrpc: "2.0",
+          id: req.id,
+          result: await getDiagnosticsを処理(
+            (req as RpcRequest<Extract<Request, { method: "getDiagnostics" }>>).params,
+          ),
+        };
+      case "listCommands":
+        return {
+          jsonrpc: "2.0",
+          id: req.id,
+          result: await listCommandsを処理(
+            (req as RpcRequest<Extract<Request, { method: "listCommands" }>>).params,
+          ),
+        };
+      case "executeCommand":
+        return {
+          jsonrpc: "2.0",
+          id: req.id,
+          result: await executeCommandを処理(
+            (req as RpcRequest<Extract<Request, { method: "executeCommand" }>>).params,
+          ),
+        };
+      case "getWorkspaceStatus":
+        return {
+          jsonrpc: "2.0",
+          id: req.id,
+          result: await getWorkspaceStatusを処理(),
+        };
+      case "saveAllDirty":
+        return {
+          jsonrpc: "2.0",
+          id: req.id,
+          result: await saveAllDirtyを処理(
+            (req as RpcRequest<Extract<Request, { method: "saveAllDirty" }>>).params,
+          ),
+        };
+      case "getDocumentState":
+        return {
+          jsonrpc: "2.0",
+          id: req.id,
+          result: await getDocumentStateを処理(
+            (req as RpcRequest<Extract<Request, { method: "getDocumentState" }>>).params,
           ),
         };
       default:
