@@ -65,11 +65,32 @@ export type Request =
 
 // ===== レスポンス型 =====
 
+// rename が失敗した・できなかった場合の分類。呼び出し側 (Claude 等) が
+// 「位置がズレているのか / LSP が rename 不可なのか」を機械的に判別できる。
+export type RenameFailureKind =
+  | "positionNotOnIdentifier" // 与えられた位置が識別子の上ではない
+  | "providerReturnedNoEdits" // rename provider が呼べたが編集なし
+  | "providerError" // rename provider が例外を投げた
+  | "applyEditFailed"; // workspace.applyEdit が false を返した
+
+export type 位置補正情報 = {
+  // P1.1: 与えられた position が識別子境界外だったので prepareRename の範囲先頭に補正した
+  from: { line: number; character: number };
+  to: { line: number; character: number };
+  reason: string;
+};
+
 export type RenameSymbolResult = {
   applied: boolean;
   filesChanged: ファイル編集[];
   totalEditCount: number;
   warnings: string[];
+  // P1.1: 位置補正が走った場合のみ非 null
+  positionAdjusted: 位置補正情報 | null;
+  // P1.2: mod 宣言 rename に伴い #[path = "..."] 属性も同期書き換えした件数
+  pathAttributeUpdatesAdded: number;
+  // P2.4: applied=false のときの失敗種別
+  failureKind: RenameFailureKind | null;
 };
 
 export type FindSymbolResult = {
