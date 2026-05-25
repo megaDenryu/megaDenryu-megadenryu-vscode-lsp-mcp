@@ -1,0 +1,70 @@
+{
+  "name": "megadenryu-vscode-lsp-mcp",
+  "displayName": "megaDenryu VSCode LSP MCP",
+  "description": "VSCode 拡張内に MCP server を立ち上げ、VSCode の LSP (rust-analyzer / tsserver 等) を Claude Code から rename_symbol などで操作可能にする",
+  "version": "0.1.0",
+  "publisher": "megaDenryu",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.92.0",
+    "node": ">=20"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "megadenryuLspMcp.showStatus",
+        "title": "megaDenryu LSP MCP: 状態を表示"
+      },
+      {
+        "command": "megadenryuLspMcp.restartServer",
+        "title": "megaDenryu LSP MCP: サーバー再起動"
+      }
+    ],
+    "configuration": {
+      "title": "megaDenryu LSP MCP",
+      "properties": {
+        "megadenryuLspMcp.port": {
+          "type": "number",
+          "default": 17800,
+          "description": "拡張が listen する WebSocket ポート (MCP server 側からも同じポートに接続)"
+        },
+        "megadenryuLspMcp.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "VSCode 起動時に WebSocket server を自動起動する"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "vsce package --no-dependencies --allow-missing-repository",
+    "mcp": "node ./dist/mcp.js"
+  },
+  "bin": {
+    "megadenryu-vscode-lsp-mcp": "./dist/mcp.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.92.0",
+    "@types/ws": "^8.5.13",
+    "@vscode/vsce": "^3.2.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.5"
+  }
+}
