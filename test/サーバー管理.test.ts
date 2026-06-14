@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import WebSocket from "ws";
@@ -9,6 +10,7 @@ import { サーバー管理 } from "../src/extension/サーバー管理";
 
 const 管理群: サーバー管理[] = [];
 const 作成ディレクトリ群: string[] = [];
+let 次の試験ポート = 25000;
 
 function 試験用応答(id: string): RpcResponse {
   return {
@@ -16,7 +18,7 @@ function 試験用応答(id: string): RpcResponse {
     id,
     result: {
       pong: true,
-      extensionVersion: "0.2.0",
+      extensionVersion: "0.3.0",
       workspaceFolders: ["C:\\devs\\Test"],
     },
   };
@@ -25,14 +27,12 @@ function 試験用応答(id: string): RpcResponse {
 async function 管理を作る(
   登録簿: インスタンス登録簿,
   ワークスペース名: string,
-  ポート設定値 = 0,
+  ポート設定値?: number,
 ): Promise<サーバー管理> {
+  const 固定ポート = ポート設定値 ?? (await 空き固定ポートを得る());
   const 管理 = new サーバー管理(
     () => ({
-      ポート設定:
-        ポート設定値 === 0
-          ? { 種別: "自動割り当て" }
-          : { 種別: "固定", ポート: ポート設定値 },
+      ポート設定: { 種別: "固定", ポート: 固定ポート },
       自動起動: true,
     }),
     () => ({
@@ -46,6 +46,37 @@ async function 管理を作る(
   );
   管理群.push(管理);
   return 管理;
+}
+
+async function 空き固定ポートを得る(): Promise<number> {
+  while (次の試験ポート <= 65535) {
+    const 候補 = 次の試験ポート;
+    次の試験ポート += 1;
+    const 使用可能 = await new Promise<boolean>((resolve, reject) => {
+      const 検査用サーバー = createServer();
+      検査用サーバー.once("error", (エラー) => {
+        if ("code" in エラー && エラー.code === "EADDRINUSE") {
+          resolve(false);
+          return;
+        }
+        reject(エラー);
+      });
+      検査用サーバー.once("listening", () => {
+        検査用サーバー.close((エラー) => {
+          if (エラー !== undefined) {
+            reject(エラー);
+            return;
+          }
+          resolve(true);
+        });
+      });
+      検査用サーバー.listen(候補, "127.0.0.1");
+    });
+    if (使用可能) {
+      return 候補;
+    }
+  }
+  throw new Error("試験用の空きポートがありません。");
 }
 
 function 稼働状態を得る(管理: サーバー管理) {
@@ -91,7 +122,7 @@ afterEach(async () => {
 });
 
 describe("サーバー管理", () => {
-  it("複数ワークスペースが自動割り当てで同時起動する", async () => {
+  it("複数ワークスペースが異なる固定ポートで同時起動する", async () => {
     const ディレクトリ = await mkdtemp(join(tmpdir(), "lsp-mcp-server-"));
     作成ディレクトリ群.push(ディレクトリ);
     const 登録簿 = new インスタンス登録簿(ディレクトリ);
@@ -146,7 +177,8 @@ describe("サーバー管理", () => {
     const 二つ目状態 = 二つ目.状態を取得する();
     expect(二つ目状態.種別).toBe("失敗");
     if (二つ目状態.種別 === "失敗") {
-      expect(二つ目状態.理由).toContain("EADDRINUSE");
+      expect(二つ目状態.理由).toContain("FixedOne");
+      expect(二つ目状態.理由).toContain("使用中");
     }
   });
 

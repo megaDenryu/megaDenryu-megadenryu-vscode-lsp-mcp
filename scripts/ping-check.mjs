@@ -1,8 +1,8 @@
 // 拡張が WebSocket を listen しているかの疎通確認用スクリプト (CI / 手動デバッグ用)。
-// 対象ワークスペースの登録ポートに ping を投げ、応答内容を stdout に書く。
+// 指定した固定ポートに ping を投げ、応答内容を stdout に書く。
 //
 // 使い方:
-//   node scripts/ping-check.mjs           # 現在ディレクトリから自動選択
+//   MEGADENRYU_LSP_MCP_PORT=17801 node scripts/ping-check.mjs
 //   node scripts/ping-check.mjs 17801     # ポート指定
 //
 // 終了コード: 0 成功 / 1 接続エラー / 2 タイムアウト

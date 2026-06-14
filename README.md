@@ -2,38 +2,75 @@
 
 VS Code が保持している rust-analyzer、TypeScript Language Features などの言語サーバーを、MCP クライアントから操作する拡張です。
 
-## 複数ワークスペース
+## 接続構成
 
-各 VS Code ウィンドウは独立した WebSocket サーバーを起動します。既定設定では OS が空きポートを割り当てるため、複数のワークスペースを同時に開いてもポート競合しません。
+Claude と MCP server の間は stdio、MCP server と VS Code 拡張の間はローカル WebSocket です。
 
+```text
+Claude
+  └─ stdio
+      └─ Node.js MCP server
+          └─ ws://127.0.0.1:<ワークスペース固定ポート>
+              └─ VS Code 拡張
+                  └─ VS Code API / 言語サーバー
 ```
-[MCP client A] <--stdio--> [MCP server A] <--WebSocket--> [VS Code: Workspace A]
-[MCP client B] <--stdio--> [MCP server B] <--WebSocket--> [VS Code: Workspace B]
+
+HTTP MCP serverではありません。ポートは、Node.js MCP server と VS Code 拡張を接続する WebSocket の待受番号です。
+
+## ワークスペース固定ポート
+
+各ワークスペースは一つの固定ポートを持ちます。
+
+1. `megadenryuLspMcp.port` が未設定なら、初回だけ未割当かつ現在未使用の番号を選ぶ。
+2. 選んだ番号を VS Code のワークスペース設定へ保存する。
+3. 以後は VS Code を再起動しても同じ番号を使う。
+4. 保存済み番号が使用中でも別番号へ変更せず、起動失敗として管理画面へ表示する。
+5. 利用者が管理画面から番号を変更する場合、他ワークスペースへの割当と現在の使用状況を検査してから保存する。
+
+全ワークスペース共通の割当台帳は、番号の重複割当を防ぐためだけに使用します。MCP server が接続先を推定する用途には使いません。
+
+## Claude側の設定
+
+`.mcp.json` には、VS Code の管理画面に表示された固定ポートを必ず明記します。
+
+```json
+{
+  "mcpServers": {
+    "vscode-lsp-mcp": {
+      "command": "node",
+      "args": [
+        "C:/devs/PokemonBattleAI/submodules/megadenryu-vscode-lsp-mcp/dist/mcp.js"
+      ],
+      "env": {
+        "MEGADENRYU_LSP_MCP_PORT": "17800"
+      }
+    }
+  }
+}
 ```
 
-各拡張インスタンスは、ワークスペースのパスと実ポートを利用者ディレクトリの登録簿へ公開します。MCP server は次の順で接続先を決めます。
+`MEGADENRYU_LSP_MCP_PORT` がない場合、MCP server は接続先を推定せず起動エラーになります。別のワークスペースでは、そのワークスペースへ割り当てられた別番号を設定してください。
 
-1. `MEGADENRYU_LSP_MCP_PORT` があれば、その固定ポートを使う。
-2. `MEGADENRYU_LSP_MCP_WORKSPACE` があれば、そのパスを含む VS Code ワークスペースを選ぶ。
-3. 未指定なら MCP server の現在ディレクトリを含むワークスペースを選ぶ。
-4. 一致するウィンドウが複数ある場合は、候補を表示して接続を拒否する。
-5. 登録情報が一件もない場合だけ、旧版拡張との互換のため `17800` へ接続する。
+管理画面の `MCP 設定をコピー` から、インストール済み拡張の MCP server パスと固定ポートを含む設定をコピーできます。
 
-## 管理 UI
+## 管理画面
 
-アクティビティバーの `LSP MCP` から専用サイドバーを開けます。状態バーにも現在の実ポートが表示されます。
-
-管理できる項目:
+アクティビティバーの `LSP MCP` サイドバーと状態バーから、次の情報と操作を利用できます。
 
 - サーバーの起動、停止、再起動
-- 自動割り当てと固定ポートの切り替え
+- ワークスペース固定ポートの表示と変更
 - VS Code 起動時の自動起動
-- 現在の実ポートと MCP 接続数
-- 登録簿への公開状態
-- 同時に稼働している全 VS Code ワークスペース
-- `MEGADENRYU_LSP_MCP_WORKSPACE` 用の設定断片コピー
-- 実ポートのコピー
+- MCP 接続数
+- 同時に稼働している VS Code ワークスペース
+- `.mcp.json` 用設定のコピー
+- 固定ポートのコピー
 - 出力ログの表示
+
+ポート競合時は次のように区別して表示します。
+
+- 本拡張の別ワークスペースが使用中: ワークスペース名を表示
+- それ以外のプロセスが使用中: 別アプリケーションが使用中と表示
+- 共通台帳で別ワークスペースへ割当済み: 設定の保存前に拒否
 
 ## 提供する MCP ツール
 
@@ -51,102 +88,26 @@ VS Code が保持している rust-analyzer、TypeScript Language Features な�
 | `get_document_state` | 文書の状態と内容の取得 |
 | `ping` | 接続先ワークスペースの確認 |
 
-## セットアップ
-
-### 1. ビルドと VSIX 作成
+## ビルドとインストール
 
 ```pwsh
 npm install --prefix submodules/megadenryu-vscode-lsp-mcp
-npm run build --prefix submodules/megadenryu-vscode-lsp-mcp
-npm run package --prefix submodules/megadenryu-vscode-lsp-mcp
-```
-
-### 2. 拡張のインストール
-
-```pwsh
-code --install-extension submodules/megadenryu-vscode-lsp-mcp/megadenryu-vscode-lsp-mcp-0.2.0.vsix --force
-```
-
-インストール後、開いている各 VS Code ウィンドウを再読み込みします。`LSP MCP` サイドバーで、それぞれ異なる実ポートが表示されれば複数ワークスペース対応が有効です。
-
-### 3. MCP server の登録
-
-リポジトリの `.mcp.json` から起動する場合:
-
-```json
-{
-  "mcpServers": {
-    "vscode-lsp-mcp": {
-      "command": "node",
-      "args": ["./submodules/megadenryu-vscode-lsp-mcp/dist/mcp.js"]
-    }
-  }
-}
-```
-
-通常は環境変数の指定は不要です。MCP クライアントがリポジトリ直下で server を起動すれば、現在ディレクトリから対象 VS Code ウィンドウが選ばれます。
-
-別の場所から起動する場合:
-
-```json
-{
-  "env": {
-    "MEGADENRYU_LSP_MCP_WORKSPACE": "C:/devs/PokemonBattleAI"
-  }
-}
-```
-
-固定ポートへ直接接続する場合:
-
-```json
-{
-  "env": {
-    "MEGADENRYU_LSP_MCP_PORT": "17801"
-  }
-}
-```
-
-## VS Code 設定
-
-```json
-{
-  "megadenryuLspMcp.port": 0,
-  "megadenryuLspMcp.autoStart": true
-}
-```
-
-- `port: 0`: ウィンドウごとに空きポートを自動割り当てする既定設定。
-- `port: 1..65535`: ワークスペース設定として固定ポートを使う。
-- `autoStart: true`: VS Code ウィンドウ起動時に server を起動する。
-
-固定ポートを使う場合、別のウィンドウと同じ番号を設定すると後から起動した方が `EADDRINUSE` で失敗します。サイドバーから別の番号へ変更して再起動してください。
-
-## 動作確認
-
-```pwsh
-node submodules/megadenryu-vscode-lsp-mcp/scripts/ping-check.mjs
-```
-
-現在ディレクトリに対応する VS Code ウィンドウへ接続し、ワークスペースフォルダを含む `pong` 応答を表示します。特定ポートを確認する場合は末尾に番号を渡せます。
-
-## 開発
-
-```pwsh
 npm run typecheck --prefix submodules/megadenryu-vscode-lsp-mcp
 npm test --prefix submodules/megadenryu-vscode-lsp-mcp
 npm run build --prefix submodules/megadenryu-vscode-lsp-mcp
+npm run package --prefix submodules/megadenryu-vscode-lsp-mcp
+code --install-extension submodules/megadenryu-vscode-lsp-mcp/megadenryu-vscode-lsp-mcp-0.3.0.vsix --force
 ```
 
-検証では、自動ポートの複数同時起動、登録簿による選択、固定ポート競合、実 WebSocket の RPC 応答を確認します。
+インストール後、開いている各 VS Code ウィンドウを再読み込みします。
 
-## 問題の切り分け
+## 手動疎通確認
 
-- サイドバーが `停止中`: `起動` を実行する。
-- `起動失敗` と表示される: 項目の理由と出力ログを確認する。
-- 登録簿が `公開失敗`: 利用者ディレクトリの `.megadenryu-vscode-lsp-mcp/instances` へ書き込めるか確認する。
-- MCP server が複数候補を報告する: 同じワークスペースを重複して開いているウィンドウを閉じるか、固定ポートを明示する。
-- MCP server が対象を見つけられない: `MEGADENRYU_LSP_MCP_WORKSPACE` に対象ルートを指定する。
-- `rename_symbol` が編集なしを返す: 対象位置、言語サーバーの起動状態、対象シンボルが名前変更可能かを確認する。
+```pwsh
+node submodules/megadenryu-vscode-lsp-mcp/scripts/ping-check.mjs 17800
+```
+
+または `MEGADENRYU_LSP_MCP_PORT` を設定してから実行します。
 
 ## ライセンス
 

@@ -1,18 +1,21 @@
 export const ホスト = "127.0.0.1";
-export const 自動割り当て指定値 = 0;
-export const 旧版既定ポート = 17800;
 
-export type ポート設定 =
-  | { 種別: "自動割り当て" }
-  | { 種別: "固定"; ポート: number };
+export type ポート設定 = { 種別: "固定"; ポート: number };
 
 export function ポート設定を解釈する(設定値: number): ポート設定 {
-  if (!Number.isInteger(設定値) || 設定値 < 0 || 設定値 > 65535) {
+  if (!Number.isInteger(設定値) || 設定値 < 1 || 設定値 > 65535) {
     throw new Error(`ポート設定が不正です: ${設定値}`);
   }
-  return 設定値 === 自動割り当て指定値
-    ? { 種別: "自動割り当て" }
-    : { 種別: "固定", ポート: 設定値 };
+  return { 種別: "固定", ポート: 設定値 };
+}
+
+export function 保存済みポートを解釈する(
+  設定値: number | null | undefined,
+): number | undefined {
+  if (設定値 === null || 設定値 === undefined) {
+    return undefined;
+  }
+  return ポート設定を解釈する(設定値).ポート;
 }
 
 export function 環境変数ポートを解釈する(
@@ -31,11 +34,9 @@ export function 環境変数ポートを解釈する(
 }
 
 export function 待受ポートを取得する(設定: ポート設定): number {
-  return 設定.種別 === "自動割り当て" ? 0 : 設定.ポート;
+  return 設定.ポート;
 }
 
 export function ポート設定を表示する(設定: ポート設定): string {
-  return 設定.種別 === "自動割り当て"
-    ? "自動割り当て"
-    : `固定 ${設定.ポート}`;
+  return `固定 ${設定.ポート}`;
 }

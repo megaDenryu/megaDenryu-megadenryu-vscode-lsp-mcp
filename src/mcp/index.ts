@@ -16,7 +16,7 @@ import { ツールを呼び出す } from "./ツール呼び出し";
 
 function MCPサーバーを作る(client: 拡張クライアント): Server {
   const server = new Server(
-    { name: "megadenryu-vscode-lsp-mcp", version: "0.2.0" },
+    { name: "megadenryu-vscode-lsp-mcp", version: "0.3.0" },
     { capabilities: { tools: {} } },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
@@ -27,7 +27,7 @@ function MCPサーバーを作る(client: 拡張クライアント): Server {
 }
 
 async function main(): Promise<void> {
-  const 接続先 = await MCP接続先を解決する(process.env, process.cwd());
+  const 接続先 = MCP接続先を解決する(process.env);
   const client = new 拡張クライアント(接続先.ポート);
   const server = MCPサーバーを作る(client);
   const transport = new StdioServerTransport();

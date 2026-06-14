@@ -14,6 +14,7 @@ import {
   インスタンス公開,
 } from "./インスタンス公開";
 import type { 拡張設定, サーバー状態 } from "./サーバー状態";
+import { 起動失敗理由を作る } from "./起動競合理由";
 
 type 状態購読解除 = { dispose(): void };
 type リクエスト処理 = (req: RpcRequest) => Promise<RpcResponse>;
@@ -32,7 +33,7 @@ export class サーバー管理 {
     private readonly ワークスペース取得: () => ワークスペース情報,
     リクエストを処理する: リクエスト処理,
     private readonly ログ: (message: string) => void,
-    登録簿: インスタンス登録簿 = new インスタンス登録簿(),
+    private readonly 登録簿: インスタンス登録簿 = new インスタンス登録簿(),
   ) {
     this.接続管理 = new WebSocket接続管理(
       リクエストを処理する,
@@ -55,6 +56,14 @@ export class サーバー管理 {
 
   状態を取得する(): サーバー状態 {
     return this.現在状態;
+  }
+
+  設定失敗を報告する(理由: string): void {
+    this.状態を変更する({
+      種別: "失敗",
+      理由,
+      ポート設定: this.設定取得().ポート設定,
+    });
   }
 
   状態変更を購読する(
@@ -133,7 +142,12 @@ export class サーバー管理 {
       }, 5_000);
       this.ログ(`WebSocket server listening on ws://${ホスト}:${実ポート}`);
     } catch (error) {
-      const 理由 = error instanceof Error ? error.message : String(error);
+      const 理由 = await 起動失敗理由を作る(
+        error,
+        設定.ポート設定.ポート,
+        this.登録簿,
+        this.ログ,
+      );
       this.サーバー = undefined;
       this.状態を変更する({
         種別: "失敗",

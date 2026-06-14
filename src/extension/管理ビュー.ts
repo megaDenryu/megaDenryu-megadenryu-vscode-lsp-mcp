@@ -111,7 +111,7 @@ export class 管理ビュー
         "root-folder",
       ),
       new 管理項目(
-        "ポート設定",
+        "固定ポート",
         ポート設定を表示する(状態ポート設定 ?? 設定.ポート設定),
         "settings-gear",
         [],
@@ -169,13 +169,13 @@ export class 管理ビュー
         command: "megadenryuLspMcp.restartServer",
         title: "再起動",
       }),
-      new 管理項目("ワークスペース指定をコピー", undefined, "copy", [], {
-        command: "megadenryuLspMcp.copyWorkspaceSelector",
-        title: "ワークスペース指定をコピー",
+      new 管理項目("MCP 設定をコピー", undefined, "copy", [], {
+        command: "megadenryuLspMcp.copyMcpConfiguration",
+        title: "MCP 設定をコピー",
       }),
-      new 管理項目("実ポートをコピー", undefined, "clippy", [], {
+      new 管理項目("固定ポートをコピー", undefined, "clippy", [], {
         command: "megadenryuLspMcp.copyPort",
-        title: "実ポートをコピー",
+        title: "固定ポートをコピー",
       }),
       new 管理項目("ログを表示", undefined, "output", [], {
         command: "megadenryuLspMcp.showLog",
