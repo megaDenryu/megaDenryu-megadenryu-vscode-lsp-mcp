@@ -1,17 +1,41 @@
-// 拡張と MCP server で共有する起動設定。
-// MCP server 側は環境変数 MEGADENRYU_LSP_MCP_PORT で上書き可能。
+export const ホスト = "127.0.0.1";
+export const 自動割り当て指定値 = 0;
+export const 旧版既定ポート = 17800;
 
-export const 既定ポート = 17800;
+export type ポート設定 =
+  | { 種別: "自動割り当て" }
+  | { 種別: "固定"; ポート: number };
 
-export function ポート解決(envValue: string | undefined): number {
-  if (envValue === undefined || envValue === "") {
-    return 既定ポート;
+export function ポート設定を解釈する(設定値: number): ポート設定 {
+  if (!Number.isInteger(設定値) || 設定値 < 0 || 設定値 > 65535) {
+    throw new Error(`ポート設定が不正です: ${設定値}`);
   }
-  const n = Number.parseInt(envValue, 10);
-  if (Number.isNaN(n) || n < 1 || n > 65535) {
-    throw new Error(`MEGADENRYU_LSP_MCP_PORT が不正です: ${envValue}`);
-  }
-  return n;
+  return 設定値 === 自動割り当て指定値
+    ? { 種別: "自動割り当て" }
+    : { 種別: "固定", ポート: 設定値 };
 }
 
-export const ホスト = "127.0.0.1";
+export function 環境変数ポートを解釈する(
+  環境変数値: string | undefined,
+): number | undefined {
+  if (環境変数値 === undefined || 環境変数値.trim() === "") {
+    return undefined;
+  }
+  const ポート = Number(環境変数値);
+  if (!Number.isInteger(ポート) || ポート < 1 || ポート > 65535) {
+    throw new Error(
+      `MEGADENRYU_LSP_MCP_PORT が不正です: ${環境変数値}`,
+    );
+  }
+  return ポート;
+}
+
+export function 待受ポートを取得する(設定: ポート設定): number {
+  return 設定.種別 === "自動割り当て" ? 0 : 設定.ポート;
+}
+
+export function ポート設定を表示する(設定: ポート設定): string {
+  return 設定.種別 === "自動割り当て"
+    ? "自動割り当て"
+    : `固定 ${設定.ポート}`;
+}

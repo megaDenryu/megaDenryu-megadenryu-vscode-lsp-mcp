@@ -2,7 +2,7 @@
   "name": "megadenryu-vscode-lsp-mcp",
   "displayName": "megaDenryu VSCode LSP MCP",
   "description": "VSCode 拡張内に MCP server を立ち上げ、VSCode の LSP (rust-analyzer / tsserver 等) を Claude Code から rename_symbol などで操作可能にする",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "megaDenryu",
   "license": "MIT",
   "private": true,
@@ -12,7 +12,8 @@
   },
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:megadenryuLspMcp.control"
   ],
   "contributes": {
     "commands": [
@@ -23,19 +24,94 @@
       {
         "command": "megadenryuLspMcp.restartServer",
         "title": "megaDenryu LSP MCP: サーバー再起動"
+      },
+      {
+        "command": "megadenryuLspMcp.startServer",
+        "title": "megaDenryu LSP MCP: サーバー起動",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "megadenryuLspMcp.stopServer",
+        "title": "megaDenryu LSP MCP: サーバー停止",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "megadenryuLspMcp.setPort",
+        "title": "megaDenryu LSP MCP: ポートを変更"
+      },
+      {
+        "command": "megadenryuLspMcp.toggleAutoStart",
+        "title": "megaDenryu LSP MCP: 自動起動を切り替え"
+      },
+      {
+        "command": "megadenryuLspMcp.copyWorkspaceSelector",
+        "title": "megaDenryu LSP MCP: ワークスペース指定をコピー"
+      },
+      {
+        "command": "megadenryuLspMcp.copyPort",
+        "title": "megaDenryu LSP MCP: 実ポートをコピー"
+      },
+      {
+        "command": "megadenryuLspMcp.showLog",
+        "title": "megaDenryu LSP MCP: ログを表示"
+      },
+      {
+        "command": "megadenryuLspMcp.refresh",
+        "title": "megaDenryu LSP MCP: 表示を更新",
+        "icon": "$(refresh)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "megadenryuLspMcp",
+          "title": "LSP MCP",
+          "icon": "media/lsp-mcp.svg"
+        }
+      ]
+    },
+    "views": {
+      "megadenryuLspMcp": [
+        {
+          "id": "megadenryuLspMcp.control",
+          "name": "ワークスペース管理"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "megadenryuLspMcp.startServer",
+          "when": "view == megadenryuLspMcp.control",
+          "group": "navigation@1"
+        },
+        {
+          "command": "megadenryuLspMcp.stopServer",
+          "when": "view == megadenryuLspMcp.control",
+          "group": "navigation@2"
+        },
+        {
+          "command": "megadenryuLspMcp.refresh",
+          "when": "view == megadenryuLspMcp.control",
+          "group": "navigation@3"
+        }
+      ]
+    },
     "configuration": {
       "title": "megaDenryu LSP MCP",
       "properties": {
         "megadenryuLspMcp.port": {
           "type": "number",
-          "default": 17800,
-          "description": "拡張が listen する WebSocket ポート (MCP server 側からも同じポートに接続)"
+          "default": 0,
+          "minimum": 0,
+          "maximum": 65535,
+          "scope": "window",
+          "description": "0 はウィンドウごとの自動割り当て、1 から 65535 は固定 WebSocket ポート"
         },
         "megadenryuLspMcp.autoStart": {
           "type": "boolean",
           "default": true,
+          "scope": "window",
           "description": "VSCode 起動時に WebSocket server を自動起動する"
         }
       }

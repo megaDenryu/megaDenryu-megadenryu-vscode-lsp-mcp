@@ -1,85 +1,77 @@
 # megaDenryu VSCode LSP MCP
 
-VSCode 拡張内に MCP server を立ち上げ、VSCode が抱える LSP (rust-analyzer / tsserver 等) を Claude Code 等の MCP クライアントから操作可能にする。
+VS Code が保持している rust-analyzer、TypeScript Language Features などの言語サーバーを、MCP クライアントから操作する拡張です。
 
-## なぜ自作か
+## 複数ワークスペース
 
-`Serena` ベースの LSP MCP は本プロジェクト規模の Rust workspace で cross-crate rename を完遂できなかった。VSCode 内の rust-analyzer インスタンスをそのまま再利用する設計にすれば真因 (Serena 独自起動の rust-analyzer が cross-crate を解決できない) を回避できる。詳細は親リポジトリの `doc/開発スレッド_2026-05-25_W-203_VSCode_LSP_MCP_自作.md` を参照。
-
-## アーキテクチャ
+各 VS Code ウィンドウは独立した WebSocket サーバーを起動します。既定設定では OS が空きポートを割り当てるため、複数のワークスペースを同時に開いてもポート競合しません。
 
 ```
-[Claude Code] <--stdio MCP--> [MCP server (Node)]
-                                       |
-                                       | WebSocket (ws://127.0.0.1:17800)
-                                       v
-                       [VSCode 拡張 (本拡張)]
-                                       |
-                                       | VSCode 内部 API
-                                       v
-                       [rust-analyzer / tsserver / 他 LSP]
+[MCP client A] <--stdio--> [MCP server A] <--WebSocket--> [VS Code: Workspace A]
+[MCP client B] <--stdio--> [MCP server B] <--WebSocket--> [VS Code: Workspace B]
 ```
 
-- **VSCode 拡張** (`dist/extension.js`) — `onStartupFinished` で activate し WebSocket server を起動。MCP server からの JSON-RPC を `vscode.executeDocumentRenameProvider` などに橋渡しする。
-- **MCP server** (`dist/mcp.js`) — stdio で Claude Code に接続、WebSocket で拡張を呼ぶ。Node 単体プロセス、`node ./dist/mcp.js` で起動。
+各拡張インスタンスは、ワークスペースのパスと実ポートを利用者ディレクトリの登録簿へ公開します。MCP server は次の順で接続先を決めます。
 
-両方とも **Vite library mode** (CJS) でビルドする。
+1. `MEGADENRYU_LSP_MCP_PORT` があれば、その固定ポートを使う。
+2. `MEGADENRYU_LSP_MCP_WORKSPACE` があれば、そのパスを含む VS Code ワークスペースを選ぶ。
+3. 未指定なら MCP server の現在ディレクトリを含むワークスペースを選ぶ。
+4. 一致するウィンドウが複数ある場合は、候補を表示して接続を拒否する。
+5. 登録情報が一件もない場合だけ、旧版拡張との互換のため `17800` へ接続する。
 
-## 提供 MCP ツール
+## 管理 UI
 
-### LSP 系
+アクティビティバーの `LSP MCP` から専用サイドバーを開けます。状態バーにも現在の実ポートが表示されます。
 
-| ツール名 | 役割 | 内部 VSCode API |
-|---|---|---|
-| `rename_symbol` | シンボル rename + cross-file/cross-crate 全参照更新。識別子境界外の位置でも自動補正、mod 宣言なら `#[path]` 属性も同期 | `vscode.executeDocumentRenameProvider` + `prepareRename` + `workspace.applyEdit` |
-| `find_symbol` | workspace 内シンボル名検索 | `vscode.executeWorkspaceSymbolProvider` |
-| `find_referencing_symbols` | 指定位置のシンボルの参照箇所列挙 | `vscode.executeReferenceProvider` |
+管理できる項目:
 
-### 診断 / コマンド / 状態系 (セッション 6 で追加)
+- サーバーの起動、停止、再起動
+- 自動割り当てと固定ポートの切り替え
+- VS Code 起動時の自動起動
+- 現在の実ポートと MCP 接続数
+- 登録簿への公開状態
+- 同時に稼働している全 VS Code ワークスペース
+- `MEGADENRYU_LSP_MCP_WORKSPACE` 用の設定断片コピー
+- 実ポートのコピー
+- 出力ログの表示
 
-| ツール名 | 役割 | 内部 VSCode API |
-|---|---|---|
-| `get_diagnostics(file?, severities?, limit?)` | Problems パネル相当 (rustc/rust-analyzer/tsserver 等の error/warning) | `vscode.languages.getDiagnostics` |
-| `list_commands(filter?, limit?)` | VSCode 全コマンド ID 一覧 | `vscode.commands.getCommands` |
-| `execute_command(commandId, args?)` | 任意 VSCode コマンドを実行 | `vscode.commands.executeCommand` |
-| `get_workspace_status()` | dirty 数 + git 変更 + problem 件数を集約 (= バッジ集約) | 上記 + git extension API |
-| `save_all_dirty(includeUntitled?)` | 全 dirty 文書を保存 | `vscode.workspace.saveAll` |
-| `get_document_state(file, includeText?)` | 個別ファイルの dirty + 内容取得 | `vscode.workspace.openTextDocument` |
+## 提供する MCP ツール
 
-### 疎通確認
-
-| ツール名 | 役割 |
+| ツール | 役割 |
 |---|---|
-| `ping` | 接続疎通 + 拡張バージョン + workspace folder 取得 |
+| `rename_symbol` | シンボルの名前変更と全参照更新 |
+| `rename_file` | LSP の `workspace/willRenameFiles` を伴うファイル名変更 |
+| `find_symbol` | ワークスペース内のシンボル検索 |
+| `find_referencing_symbols` | 参照箇所の列挙 |
+| `get_diagnostics` | 問題一覧の取得 |
+| `list_commands` | VS Code コマンドの一覧 |
+| `execute_command` | VS Code コマンドの実行 |
+| `get_workspace_status` | 未保存文書、git 変更、問題件数の取得 |
+| `save_all_dirty` | 未保存文書の保存 |
+| `get_document_state` | 文書の状態と内容の取得 |
+| `ping` | 接続先ワークスペースの確認 |
 
-## セットアップ手順
+## セットアップ
 
-### 1. 依存インストール + ビルド
-
-```pwsh
-cd submodules/megadenryu-vscode-lsp-mcp
-npm install
-npm run build
-```
-
-`dist/extension.js` と `dist/mcp.js` が生成される。
-
-### 2. VSCode 拡張のインストール (.vsix)
-
-```pwsh
-npm run package
-code --install-extension megadenryu-vscode-lsp-mcp-0.1.0.vsix
-```
-
-VSCode を再起動し、コマンドパレットで `megaDenryu LSP MCP: 状態を表示` が出ればインストール成功。「稼働中 (ws://127.0.0.1:17800, 接続数=0)」と表示される。
-
-### 3. MCP server を Claude Code に登録
+### 1. ビルドと VSIX 作成
 
 ```pwsh
-claude mcp add vscode-lsp-mcp -- node "C:/devs/PokemonBattleAI/submodules/megadenryu-vscode-lsp-mcp/dist/mcp.js"
+npm install --prefix submodules/megadenryu-vscode-lsp-mcp
+npm run build --prefix submodules/megadenryu-vscode-lsp-mcp
+npm run package --prefix submodules/megadenryu-vscode-lsp-mcp
 ```
 
-または `.mcp.json` (本リポジトリ直下) に追記:
+### 2. 拡張のインストール
+
+```pwsh
+code --install-extension submodules/megadenryu-vscode-lsp-mcp/megadenryu-vscode-lsp-mcp-0.2.0.vsix --force
+```
+
+インストール後、開いている各 VS Code ウィンドウを再読み込みします。`LSP MCP` サイドバーで、それぞれ異なる実ポートが表示されれば複数ワークスペース対応が有効です。
+
+### 3. MCP server の登録
+
+リポジトリの `.mcp.json` から起動する場合:
 
 ```json
 {
@@ -92,41 +84,70 @@ claude mcp add vscode-lsp-mcp -- node "C:/devs/PokemonBattleAI/submodules/megade
 }
 ```
 
-### 4. 動作確認
+通常は環境変数の指定は不要です。MCP クライアントがリポジトリ直下で server を起動すれば、現在ディレクトリから対象 VS Code ウィンドウが選ばれます。
 
-Claude Code から以下を呼ぶ:
-
-```
-mcp__vscode-lsp-mcp__ping  →  { pong: true, ... } が返れば OK
-```
-
-## 設定 (VSCode の settings.json)
+別の場所から起動する場合:
 
 ```json
 {
-  "megadenryuLspMcp.port": 17800,
+  "env": {
+    "MEGADENRYU_LSP_MCP_WORKSPACE": "C:/devs/PokemonBattleAI"
+  }
+}
+```
+
+固定ポートへ直接接続する場合:
+
+```json
+{
+  "env": {
+    "MEGADENRYU_LSP_MCP_PORT": "17801"
+  }
+}
+```
+
+## VS Code 設定
+
+```json
+{
+  "megadenryuLspMcp.port": 0,
   "megadenryuLspMcp.autoStart": true
 }
 ```
 
-MCP server 側のポート上書きは環境変数 `MEGADENRYU_LSP_MCP_PORT` で。
+- `port: 0`: ウィンドウごとに空きポートを自動割り当てする既定設定。
+- `port: 1..65535`: ワークスペース設定として固定ポートを使う。
+- `autoStart: true`: VS Code ウィンドウ起動時に server を起動する。
 
-## 開発時の流れ
+固定ポートを使う場合、別のウィンドウと同じ番号を設定すると後から起動した方が `EADDRINUSE` で失敗します。サイドバーから別の番号へ変更して再起動してください。
+
+## 動作確認
 
 ```pwsh
-npm run build:watch   # ファイル変更で自動再ビルド
-npm run typecheck     # tsc --noEmit
-npm test              # vitest (純粋関数のユニットテストのみ)
+node submodules/megadenryu-vscode-lsp-mcp/scripts/ping-check.mjs
 ```
 
-VSCode 拡張のデバッグ実行は `F5` (Extension Development Host)。本拡張プロジェクトのみを VSCode で開いてから F5。
+現在ディレクトリに対応する VS Code ウィンドウへ接続し、ワークスペースフォルダを含む `pong` 応答を表示します。特定ポートを確認する場合は末尾に番号を渡せます。
 
-## 既知の制約
+## 開発
 
-- **ポート 17800 が使用中だと起動失敗。** 設定で別ポートに変えれば回避可。
-- **複数 VSCode ウィンドウ同時起動時**、最初に起動した方が listen し、後発はポート bind 失敗する。後発側からは前者の拡張が応答する形になる (workspace が異なれば結果も異なるので注意)。
-- **rename 対象シンボルが LSP で rename 不可な場合** (例: 外部 crate のシンボル、proc macro 内識別子等) は `applied: false` + warnings が返る。
+```pwsh
+npm run typecheck --prefix submodules/megadenryu-vscode-lsp-mcp
+npm test --prefix submodules/megadenryu-vscode-lsp-mcp
+npm run build --prefix submodules/megadenryu-vscode-lsp-mcp
+```
+
+検証では、自動ポートの複数同時起動、登録簿による選択、固定ポート競合、実 WebSocket の RPC 応答を確認します。
+
+## 問題の切り分け
+
+- サイドバーが `停止中`: `起動` を実行する。
+- `起動失敗` と表示される: 項目の理由と出力ログを確認する。
+- 登録簿が `公開失敗`: 利用者ディレクトリの `.megadenryu-vscode-lsp-mcp/instances` へ書き込めるか確認する。
+- MCP server が複数候補を報告する: 同じワークスペースを重複して開いているウィンドウを閉じるか、固定ポートを明示する。
+- MCP server が対象を見つけられない: `MEGADENRYU_LSP_MCP_WORKSPACE` に対象ルートを指定する。
+- `rename_symbol` が編集なしを返す: 対象位置、言語サーバーの起動状態、対象シンボルが名前変更可能かを確認する。
 
 ## ライセンス
 
-MIT。
+MIT

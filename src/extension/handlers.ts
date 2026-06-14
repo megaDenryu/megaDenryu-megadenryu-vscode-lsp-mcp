@@ -23,8 +23,7 @@ import {
   path属性編集を計算する,
   type 追加テキスト編集,
 } from "./path属性同期";
-
-const 拡張バージョン = "0.1.0";
+import { 拡張バージョン } from "../shared/version";
 
 function ファイルパスからURI化(filePath: string): vscode.Uri {
   return vscode.Uri.file(filePath);

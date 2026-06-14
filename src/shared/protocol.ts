@@ -253,18 +253,23 @@ export type ResultMap = {
 
 // ===== JSON-RPC 風エンベロープ =====
 
-export type RpcRequest<R extends Request = Request> = {
-  jsonrpc: "2.0";
-  id: string;
-  method: R["method"];
-  params: R["params"];
-};
+export type RpcRequest<R extends Request = Request> = R extends Request
+  ? {
+      jsonrpc: "2.0";
+      id: string;
+      method: R["method"];
+      params: R["params"];
+    }
+  : never;
 
-export type RpcSuccess<M extends Request["method"]> = {
-  jsonrpc: "2.0";
-  id: string;
-  result: ResultMap[M];
-};
+export type RpcSuccess<M extends Request["method"]> =
+  M extends Request["method"]
+    ? {
+        jsonrpc: "2.0";
+        id: string;
+        result: ResultMap[M];
+      }
+    : never;
 
 export type RpcError = {
   jsonrpc: "2.0";

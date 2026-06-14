@@ -2,6 +2,7 @@
 // LSP participation で mod 宣言 + #[path] 属性が連動更新されるか観測。
 
 import WebSocket from "ws";
+import { 接続URLを解決する } from "./接続先.mjs";
 
 const oldPath = "c:\\devs\\PokemonBattleAI\\pokemon_battle_sim\\src\\型定義\\タイプ.rs";
 const newPath = "c:\\devs\\PokemonBattleAI\\pokemon_battle_sim\\src\\型定義\\タイプ_LSPテスト.rs";
@@ -23,7 +24,7 @@ const task = {
       : { oldPath: newPath, newPath: oldPath, syncPathAttribute: true },
 };
 
-const ws = new WebSocket("ws://127.0.0.1:17800");
+const ws = new WebSocket(await 接続URLを解決する());
 ws.on("open", () => ws.send(JSON.stringify(task)));
 ws.on("message", (raw) => {
   console.log(raw.toString());

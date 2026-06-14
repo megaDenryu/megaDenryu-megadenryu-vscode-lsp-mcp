@@ -3,8 +3,9 @@
 // 期待: cross-crate (pokemon_battle_sim ↔ battle_ai) を含む全 4 箇所が更新される
 
 import WebSocket from "ws";
+import { 接続URLを解決する } from "./接続先.mjs";
 
-const ws = new WebSocket("ws://127.0.0.1:17800");
+const ws = new WebSocket(await 接続URLを解決する());
 const tasks = [
   { id: "find1", method: "findSymbol", params: { query: "クロス検証ダミー構造体", limit: 10 } },
   {

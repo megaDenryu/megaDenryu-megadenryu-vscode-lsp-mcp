@@ -1,7 +1,8 @@
 // 既知の動作する struct で dry-run rename → 拡張経路自体の生存確認
 import WebSocket from "ws";
+import { 接続URLを解決する } from "./接続先.mjs";
 
-const ws = new WebSocket("ws://127.0.0.1:17800");
+const ws = new WebSocket(await 接続URLを解決する());
 const task = {
   jsonrpc: "2.0",
   id: "dry1",

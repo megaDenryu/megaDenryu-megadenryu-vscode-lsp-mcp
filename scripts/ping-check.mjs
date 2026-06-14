@@ -1,16 +1,16 @@
 // 拡張が WebSocket を listen しているかの疎通確認用スクリプト (CI / 手動デバッグ用)。
-// 既定ポート 17800 に ping を投げ、応答内容を stdout に書く。
+// 対象ワークスペースの登録ポートに ping を投げ、応答内容を stdout に書く。
 //
 // 使い方:
-//   node scripts/ping-check.mjs           # 既定ポート 17800
+//   node scripts/ping-check.mjs           # 現在ディレクトリから自動選択
 //   node scripts/ping-check.mjs 17801     # ポート指定
 //
 // 終了コード: 0 成功 / 1 接続エラー / 2 タイムアウト
 
 import WebSocket from "ws";
+import { 接続URLを解決する } from "./接続先.mjs";
 
-const port = process.argv[2] ? Number.parseInt(process.argv[2], 10) : 17800;
-const url = `ws://127.0.0.1:${port}`;
+const url = await 接続URLを解決する(process.argv[2]);
 
 const ws = new WebSocket(url);
 const timer = setTimeout(() => {
