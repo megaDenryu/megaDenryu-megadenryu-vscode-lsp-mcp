@@ -108,10 +108,16 @@ export type RenameFileRequest = {
   };
 };
 
+export type GoToDefinitionRequest = {
+  method: "goToDefinition";
+  params: 位置 & { openFile?: boolean };
+};
+
 export type Request =
   | RenameSymbolRequest
   | FindSymbolRequest
   | FindReferencingSymbolsRequest
+  | GoToDefinitionRequest
   | PingRequest
   | GetDiagnosticsRequest
   | ListCommandsRequest
@@ -237,10 +243,15 @@ export type RenameFileResult = {
   warnings: string[];
 };
 
+export type GoToDefinitionResult = {
+  definitions: 参照情報[];
+};
+
 export type ResultMap = {
   renameSymbol: RenameSymbolResult;
   findSymbol: FindSymbolResult;
   findReferencingSymbols: FindReferencingSymbolsResult;
+  goToDefinition: GoToDefinitionResult;
   ping: PingResult;
   getDiagnostics: GetDiagnosticsResult;
   listCommands: ListCommandsResult;

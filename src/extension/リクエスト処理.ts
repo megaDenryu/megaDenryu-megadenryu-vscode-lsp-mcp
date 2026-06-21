@@ -2,6 +2,7 @@ import type { RpcRequest, RpcResponse } from "../shared/protocol";
 import {
   find_referencing_symbolsを処理,
   find_symbolを処理,
+  goToDefinitionを処理,
   pingを処理,
   rename_symbolを処理,
 } from "./handlers";
@@ -40,6 +41,12 @@ export function リクエスト処理を作る(ログ: ログ出力) {
             jsonrpc: "2.0",
             id: req.id,
             result: await find_referencing_symbolsを処理(req.params),
+          };
+        case "goToDefinition":
+          return {
+            jsonrpc: "2.0",
+            id: req.id,
+            result: await goToDefinitionを処理(req.params),
           };
         case "getDiagnostics":
           return {

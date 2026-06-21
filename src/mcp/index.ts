@@ -23,6 +23,7 @@ VSCode の LSP 機能と内部コマンドを MCP ツールとして公開する
 - **rename_symbol** — シンボルのリネーム。LSP 経由で全参照を一括更新する。識別子名の変更はこれを使う（Edit で個別更新すると取りこぼしが起きる）
 - **find_symbol** — ワークスペース内のシンボル検索（クラス名・関数名・変数名等）
 - **find_referencing_symbols** — 指定位置のシンボルを参照している箇所を列挙
+- **go_to_definition** — 指定位置のシンボルの定義元を取得。openFile=true で定義先を VSCode で開く
 - **rename_file** — ファイルのリネーム。LSP が import パス等を追従更新する
 
 ### 診断・状態

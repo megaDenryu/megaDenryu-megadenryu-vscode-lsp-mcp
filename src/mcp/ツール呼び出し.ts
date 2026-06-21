@@ -6,6 +6,7 @@ import {
   findSymbolSchema,
   getDiagnosticsSchema,
   getDocumentStateSchema,
+  goToDefinitionSchema,
   listCommandsSchema,
   renameFileSchema,
   renameSymbolSchema,
@@ -41,6 +42,13 @@ export async function ツールを呼び出す(
           await client.呼び出し(
             "findReferencingSymbols",
             findReferencingSymbolsSchema.parse(args),
+          ),
+        );
+      case "go_to_definition":
+        return 結果を返す(
+          await client.呼び出し(
+            "goToDefinition",
+            goToDefinitionSchema.parse(args),
           ),
         );
       case "get_diagnostics":

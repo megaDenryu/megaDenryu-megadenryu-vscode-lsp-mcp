@@ -33,6 +33,13 @@ export const listCommandsSchema = z.object({
   includeInternal: z.boolean().default(false),
 });
 
+export const goToDefinitionSchema = z.object({
+  file: z.string().describe("対象シンボルが含まれるファイルの絶対パス"),
+  line: z.number().int().min(0).describe("0-origin の行番号"),
+  character: z.number().int().min(0).describe("0-origin の桁番号"),
+  openFile: z.boolean().default(false).describe("定義先ファイルを VSCode で開くか"),
+});
+
 export const executeCommandSchema = z.object({
   commandId: z.string().min(1),
   args: z.array(z.unknown()).optional(),
@@ -93,6 +100,25 @@ export const tools: Tool[] = [
         line: { type: "number" },
         character: { type: "number" },
         includeDeclaration: { type: "boolean", default: false },
+      },
+      required: ["file", "line", "character"],
+    },
+  },
+  {
+    name: "go_to_definition",
+    description:
+      "指定位置のシンボルの定義元を取得する。LSP の定義プロバイダを使用。openFile=true で定義先ファイルを VSCode で開く。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "対象ファイルの絶対パス" },
+        line: { type: "number", description: "0-origin の行番号" },
+        character: { type: "number", description: "0-origin の桁番号" },
+        openFile: {
+          type: "boolean",
+          default: false,
+          description: "定義先ファイルを VSCode で開くか",
+        },
       },
       required: ["file", "line", "character"],
     },

@@ -8,6 +8,8 @@ import type {
   FindReferencingSymbolsResult,
   FindSymbolRequest,
   FindSymbolResult,
+  GoToDefinitionRequest,
+  GoToDefinitionResult,
   PingResult,
   RenameSymbolRequest,
   RenameSymbolResult,
@@ -253,6 +255,46 @@ export async function find_symbolを処理(
     });
   }
   return { symbols: 結果 };
+}
+
+export async function goToDefinitionを処理(
+  params: GoToDefinitionRequest["params"],
+): Promise<GoToDefinitionResult> {
+  const uri = ファイルパスからURI化(params.file);
+  const position = new vscode.Position(params.line, params.character);
+
+  const ロケーション群 = await vscode.commands.executeCommand<
+    vscode.Location[] | vscode.LocationLink[] | undefined
+  >("vscode.executeDefinitionProvider", uri, position);
+
+  const 定義群: 参照情報[] = [];
+  for (const loc of ロケーション群 ?? []) {
+    if ("targetUri" in loc) {
+      定義群.push({
+        file: loc.targetUri.fsPath,
+        line: loc.targetRange.start.line,
+        character: loc.targetRange.start.character,
+        endLine: loc.targetRange.end.line,
+        endCharacter: loc.targetRange.end.character,
+      });
+    } else {
+      定義群.push({
+        file: loc.uri.fsPath,
+        line: loc.range.start.line,
+        character: loc.range.start.character,
+        endLine: loc.range.end.line,
+        endCharacter: loc.range.end.character,
+      });
+    }
+  }
+
+  const 最初の定義 = 定義群[0];
+  if (params.openFile && 最初の定義 !== undefined) {
+    const 定義uri = vscode.Uri.file(最初の定義.file);
+    await vscode.commands.executeCommand("vscode.open", 定義uri);
+  }
+
+  return { definitions: 定義群 };
 }
 
 export async function find_referencing_symbolsを処理(

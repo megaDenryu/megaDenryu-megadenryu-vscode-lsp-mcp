@@ -7,6 +7,7 @@ const 対応メソッド群 = new Set([
   "renameSymbol",
   "findSymbol",
   "findReferencingSymbols",
+  "goToDefinition",
   "ping",
   "getDiagnostics",
   "listCommands",
