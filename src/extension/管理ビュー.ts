@@ -4,6 +4,7 @@ import {
   type ポート設定,
 } from "../shared/config";
 import { インスタンス登録簿 } from "../shared/インスタンス登録簿";
+import { 停止操作を提示すべきか } from "./操作トグル状態";
 import type { サーバー管理 } from "./サーバー管理";
 import type { サーバー状態 } from "./サーバー状態";
 
@@ -48,6 +49,19 @@ function 状態表示(状態: サーバー状態): {
         icon: "radio-tower",
       };
   }
+}
+
+function 起動停止トグル項目を作る(状態: サーバー状態): 管理項目 {
+  if (停止操作を提示すべきか(状態)) {
+    return new 管理項目("停止", undefined, "debug-stop", [], {
+      command: "megadenryuLspMcp.stopServer",
+      title: "停止",
+    });
+  }
+  return new 管理項目("起動", undefined, "debug-start", [], {
+    command: "megadenryuLspMcp.startServer",
+    title: "起動",
+  });
 }
 
 function ポート設定を状態から得る(状態: サーバー状態): ポート設定 | undefined {
@@ -157,14 +171,7 @@ export class 管理ビュー
         ),
     );
     const 操作項目群 = [
-      new 管理項目("起動", undefined, "debug-start", [], {
-        command: "megadenryuLspMcp.startServer",
-        title: "起動",
-      }),
-      new 管理項目("停止", undefined, "debug-stop", [], {
-        command: "megadenryuLspMcp.stopServer",
-        title: "停止",
-      }),
+      起動停止トグル項目を作る(状態),
       new 管理項目("再起動", undefined, "refresh", [], {
         command: "megadenryuLspMcp.restartServer",
         title: "再起動",

@@ -10,6 +10,7 @@ import { 管理ビュー } from "./管理ビュー";
 import { ポートが使用中か } from "./ポート使用検査";
 import { サーバー管理 } from "./サーバー管理";
 import type { 拡張設定 } from "./サーバー状態";
+import { 操作ボタン文脈を作る } from "./操作ボタン文脈";
 import { 状態バーを作る } from "./状態バー";
 import { リクエスト処理を作る } from "./リクエスト処理";
 
@@ -76,8 +77,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     treeDataProvider: 管理表示,
   });
   const 状態バー = 状態バーを作る(サーバー);
+  const 操作ボタン文脈 = 操作ボタン文脈を作る(サーバー);
 
-  context.subscriptions.push(出力, 管理表示, ツリー, 状態バー);
+  context.subscriptions.push(出力, 管理表示, ツリー, 状態バー, 操作ボタン文脈);
   拡張操作を登録する({
     context,
     サーバー,

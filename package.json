@@ -82,18 +82,18 @@
       "view/title": [
         {
           "command": "megadenryuLspMcp.startServer",
-          "when": "view == megadenryuLspMcp.control",
+          "when": "view == megadenryuLspMcp.control && !megadenryuLspMcp.canStopServer",
           "group": "navigation@1"
         },
         {
           "command": "megadenryuLspMcp.stopServer",
-          "when": "view == megadenryuLspMcp.control",
-          "group": "navigation@2"
+          "when": "view == megadenryuLspMcp.control && megadenryuLspMcp.canStopServer",
+          "group": "navigation@1"
         },
         {
           "command": "megadenryuLspMcp.refresh",
           "when": "view == megadenryuLspMcp.control",
-          "group": "navigation@3"
+          "group": "navigation@2"
         }
       ]
     },
@@ -118,6 +118,7 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "vite build",
     "build": "vite build",
     "build:watch": "vite build --watch",
     "typecheck": "tsc --noEmit",

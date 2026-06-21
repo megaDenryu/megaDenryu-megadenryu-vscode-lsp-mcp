@@ -131,12 +131,19 @@ export const tools: Tool[] = [
   },
   {
     name: "execute_command",
-    description: "VSCode コマンドを実行する。",
+    description:
+      "VSCode コマンドを実行する。文字列引数が URI 形式（scheme://...）なら自動的に vscode.Uri に変換される。" +
+      "ファイルを開く例: execute_command({ commandId: 'vscode.open', args: ['file:///c:/path/to/file.ts'] })",
     inputSchema: {
       type: "object",
       properties: {
-        commandId: { type: "string" },
-        args: { type: "array", items: {} },
+        commandId: { type: "string", description: "VSCode コマンドの識別子" },
+        args: {
+          type: "array",
+          items: {},
+          description:
+            "コマンドに渡す引数。scheme:// で始まる文字列は vscode.Uri に自動変換される",
+        },
       },
       required: ["commandId"],
     },
