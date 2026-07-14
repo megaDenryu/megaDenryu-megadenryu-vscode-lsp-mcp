@@ -2,6 +2,7 @@
 // / get_workspace_status / save_all_dirty / get_document_state) の動作確認。
 
 import WebSocket from "ws";
+import { 接続URLを解決する } from "./接続先.mjs";
 
 const tasks = [
   { id: "ping", method: "ping", params: {} },
@@ -32,7 +33,7 @@ const tasks = [
   },
 ];
 
-const ws = new WebSocket("ws://127.0.0.1:17800");
+const ws = new WebSocket(await 接続URLを解決する());
 let i = 0;
 
 ws.on("open", () => send());

@@ -12,6 +12,7 @@
 // 検証スクリプトは投入結果を出力するだけで、Rust ファイルの作成・削除は呼び出し側で行う。
 
 import WebSocket from "ws";
+import { 接続URLを解決する } from "./接続先.mjs";
 
 const libRsAbs = "c:\\devs\\PokemonBattleAI\\pokemon_battle_sim\\src\\lib.rs";
 // lib.rs の `pub mod クロス検証用ダミー2;` の行を引数から渡す
@@ -63,7 +64,7 @@ const tasks = [
   },
 ];
 
-const ws = new WebSocket("ws://127.0.0.1:17800");
+const ws = new WebSocket(await 接続URLを解決する());
 let i = 0;
 
 ws.on("open", () => send());

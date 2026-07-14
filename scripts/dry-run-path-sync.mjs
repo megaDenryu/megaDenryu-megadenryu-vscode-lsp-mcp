@@ -2,8 +2,9 @@
 // apply=false で実害なし。pathAttributeUpdatesAdded === 1 が期待される。
 
 import WebSocket from "ws";
+import { 接続URLを解決する } from "./接続先.mjs";
 
-const ws = new WebSocket("ws://127.0.0.1:17800");
+const ws = new WebSocket(await 接続URLを解決する());
 const task = {
   jsonrpc: "2.0",
   id: "path1",

@@ -1,251 +1,109 @@
-// VSCode 拡張エントリ。activate で WebSocket server を起動し、
-// MCP server プロセス (別 Node プロセス) からの JSON-RPC を受け付ける。
-
 import * as vscode from "vscode";
-import { WebSocketServer, type WebSocket } from "ws";
-import type {
-  RpcRequest,
-  RpcResponse,
-  Request,
-} from "../shared/protocol";
-import { ホスト, 既定ポート } from "../shared/config";
+import { 固定ポート割当 } from "../shared/固定ポート割当";
 import {
-  find_referencing_symbolsを処理,
-  find_symbolを処理,
-  pingを処理,
-  rename_symbolを処理,
-} from "./handlers";
-import {
-  executeCommandを処理,
-  getDiagnosticsを処理,
-  getDocumentStateを処理,
-  getWorkspaceStatusを処理,
-  listCommandsを処理,
-  saveAllDirtyを処理,
-} from "./診断と状態";
-import { renameFileを処理 } from "./ファイルrename";
+  インスタンス登録簿,
+  type ワークスペース情報,
+} from "../shared/インスタンス登録簿";
+import { 固定ポート設定管理 } from "./固定ポート設定管理";
+import { 拡張操作を登録する } from "./拡張操作";
+import { 管理ビュー } from "./管理ビュー";
+import { ポートが使用中か } from "./ポート使用検査";
+import { サーバー管理 } from "./サーバー管理";
+import type { 拡張設定 } from "./サーバー状態";
+import { 操作ボタン文脈を作る } from "./操作ボタン文脈";
+import { 状態バーを作る } from "./状態バー";
+import { リクエスト処理を作る } from "./リクエスト処理";
 
-let サーバー: WebSocketServer | undefined;
-let 出力チャンネル: vscode.OutputChannel | undefined;
-let 接続クライアント数 = 0;
-
-function 設定取得() {
-  const conf = vscode.workspace.getConfiguration("megadenryuLspMcp");
+function ワークスペース情報を取得する(): ワークスペース情報 {
+  const フォルダ群 = vscode.workspace.workspaceFolders ?? [];
   return {
-    port: conf.get<number>("port", 既定ポート),
-    autoStart: conf.get<boolean>("autoStart", true),
+    ワークスペース名:
+      vscode.workspace.name ?? フォルダ群[0]?.name ?? "ワークスペースなし",
+    ワークスペースファイル: vscode.workspace.workspaceFile?.fsPath ?? null,
+    ワークスペースフォルダ群: フォルダ群.map(
+      (フォルダ) => フォルダ.uri.fsPath,
+    ),
   };
 }
 
-function ログ(message: string): void {
-  出力チャンネル?.appendLine(`[${new Date().toISOString()}] ${message}`);
+function 自動起動設定を取得する(): boolean {
+  return vscode.workspace
+    .getConfiguration("megadenryuLspMcp")
+    .get<boolean>("autoStart", true);
 }
 
-async function リクエスト処理(req: RpcRequest): Promise<RpcResponse> {
-  try {
-    switch (req.method) {
-      case "ping":
-        return { jsonrpc: "2.0", id: req.id, result: await pingを処理() };
-      case "renameSymbol":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await rename_symbolを処理(
-            (req as RpcRequest<Extract<Request, { method: "renameSymbol" }>>).params,
-          ),
-        };
-      case "findSymbol":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await find_symbolを処理(
-            (req as RpcRequest<Extract<Request, { method: "findSymbol" }>>).params,
-          ),
-        };
-      case "findReferencingSymbols":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await find_referencing_symbolsを処理(
-            (req as RpcRequest<Extract<Request, { method: "findReferencingSymbols" }>>).params,
-          ),
-        };
-      case "getDiagnostics":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await getDiagnosticsを処理(
-            (req as RpcRequest<Extract<Request, { method: "getDiagnostics" }>>).params,
-          ),
-        };
-      case "listCommands":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await listCommandsを処理(
-            (req as RpcRequest<Extract<Request, { method: "listCommands" }>>).params,
-          ),
-        };
-      case "executeCommand":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await executeCommandを処理(
-            (req as RpcRequest<Extract<Request, { method: "executeCommand" }>>).params,
-          ),
-        };
-      case "getWorkspaceStatus":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await getWorkspaceStatusを処理(),
-        };
-      case "saveAllDirty":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await saveAllDirtyを処理(
-            (req as RpcRequest<Extract<Request, { method: "saveAllDirty" }>>).params,
-          ),
-        };
-      case "getDocumentState":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await getDocumentStateを処理(
-            (req as RpcRequest<Extract<Request, { method: "getDocumentState" }>>).params,
-          ),
-        };
-      case "renameFile":
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          result: await renameFileを処理(
-            (req as RpcRequest<Extract<Request, { method: "renameFile" }>>).params,
-          ),
-        };
-      default:
-        return {
-          jsonrpc: "2.0",
-          id: req.id,
-          error: {
-            code: -32601,
-            message: `未知のメソッド: ${(req as RpcRequest).method}`,
-          },
-        };
-    }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    ログ(`リクエスト処理失敗: ${req.method} (${req.id}) -> ${message}`);
-    return {
-      jsonrpc: "2.0",
-      id: req.id,
-      error: { code: -32000, message, data: { method: req.method } },
-    };
-  }
+function 保存ポートを取得する(): number | null | undefined {
+  return vscode.workspace
+    .getConfiguration("megadenryuLspMcp")
+    .get<number | null>("port");
 }
 
-function クライアント接続を捌く(ws: WebSocket): void {
-  接続クライアント数 += 1;
-  ログ(`MCP クライアント接続: 接続数=${接続クライアント数}`);
-  ws.on("message", async (raw) => {
-    let req: RpcRequest;
-    try {
-      req = JSON.parse(raw.toString()) as RpcRequest;
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      ws.send(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: "",
-          error: { code: -32700, message: `JSON parse error: ${message}` },
-        }),
-      );
-      return;
-    }
-    const res = await リクエスト処理(req);
-    ws.send(JSON.stringify(res));
-  });
-  ws.on("close", () => {
-    接続クライアント数 -= 1;
-    ログ(`MCP クライアント切断: 接続数=${接続クライアント数}`);
-  });
-  ws.on("error", (err) => {
-    ログ(`WebSocket エラー: ${err.message}`);
-  });
-}
-
-async function サーバー起動(): Promise<void> {
-  if (サーバー) return;
-  const { port } = 設定取得();
-  await new Promise<void>((resolve, reject) => {
-    const wss = new WebSocketServer({ host: ホスト, port }, () => {
-      サーバー = wss;
-      ログ(`WebSocket server listening on ws://${ホスト}:${port}`);
-      resolve();
-    });
-    wss.on("error", (err) => {
-      ログ(`WebSocket server エラー: ${err.message}`);
-      if (!サーバー) reject(err);
-    });
-    wss.on("connection", クライアント接続を捌く);
-  });
-}
-
-async function サーバー停止(): Promise<void> {
-  if (!サーバー) return;
-  await new Promise<void>((resolve) => {
-    サーバー!.close(() => resolve());
-  });
-  サーバー = undefined;
-  ログ("WebSocket server stopped");
+async function ポートを保存する(ポート: number): Promise<void> {
+  await vscode.workspace
+    .getConfiguration("megadenryuLspMcp")
+    .update("port", ポート, vscode.ConfigurationTarget.Workspace);
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  出力チャンネル = vscode.window.createOutputChannel("megaDenryu LSP MCP");
-  context.subscriptions.push(出力チャンネル);
-  ログ("activate");
-
-  const 設定 = 設定取得();
-  if (設定.autoStart) {
-    try {
-      await サーバー起動();
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      ログ(`自動起動失敗: ${message}`);
-      void vscode.window.showErrorMessage(
-        `megaDenryu LSP MCP 自動起動失敗: ${message}`,
-      );
-    }
-  }
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("megadenryuLspMcp.showStatus", () => {
-      const { port } = 設定取得();
-      const status = サーバー
-        ? `稼働中 (ws://${ホスト}:${port}, 接続数=${接続クライアント数})`
-        : "停止中";
-      void vscode.window.showInformationMessage(
-        `megaDenryu LSP MCP: ${status}`,
-      );
-      出力チャンネル?.show(true);
-    }),
-    vscode.commands.registerCommand("megadenryuLspMcp.restartServer", async () => {
-      await サーバー停止();
-      await サーバー起動();
-      void vscode.window.showInformationMessage(
-        "megaDenryu LSP MCP: サーバーを再起動しました",
-      );
-    }),
+  const 出力 = vscode.window.createOutputChannel("megaDenryu LSP MCP");
+  const ログ = (message: string) =>
+    出力.appendLine(`[${new Date().toISOString()}] ${message}`);
+  const 登録簿 = new インスタンス登録簿();
+  const 固定ポート管理 = new 固定ポート設定管理(
+    new 固定ポート割当(undefined, ポートが使用中か),
+    ワークスペース情報を取得する,
+    保存ポートを取得する,
+    ポートを保存する,
   );
+  const 初期化結果 = await 固定ポート管理.初期化する();
+  const 設定取得 = (): 拡張設定 => ({
+    ポート設定: 固定ポート管理.設定を取得する(),
+    自動起動: 自動起動設定を取得する(),
+  });
+  const サーバー = new サーバー管理(
+    設定取得,
+    ワークスペース情報を取得する,
+    リクエスト処理を作る(ログ),
+    ログ,
+    登録簿,
+  );
+  const 管理表示 = new 管理ビュー(
+    サーバー,
+    設定取得,
+    () => ワークスペース情報を取得する().ワークスペース名,
+    登録簿,
+  );
+  const ツリー = vscode.window.createTreeView("megadenryuLspMcp.control", {
+    treeDataProvider: 管理表示,
+  });
+  const 状態バー = 状態バーを作る(サーバー);
+  const 操作ボタン文脈 = 操作ボタン文脈を作る(サーバー);
 
+  context.subscriptions.push(出力, 管理表示, ツリー, 状態バー, 操作ボタン文脈);
+  拡張操作を登録する({
+    context,
+    サーバー,
+    固定ポート管理,
+    管理表示,
+    出力,
+  });
   context.subscriptions.push({
     dispose: () => {
-      void サーバー停止();
+      void サーバー.dispose();
     },
   });
+
+  ログ("activate");
+  if (初期化結果.種別 === "競合") {
+    サーバー.設定失敗を報告する(初期化結果.理由);
+    void vscode.window.showErrorMessage(初期化結果.理由);
+    return;
+  }
+  if (設定取得().自動起動) {
+    await サーバー.起動する();
+  }
 }
 
 export async function deactivate(): Promise<void> {
-  await サーバー停止();
+  // ExtensionContext の subscriptions がサーバー管理を停止する。
 }

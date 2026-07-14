@@ -94,12 +94,20 @@ export async function listCommandsを処理(
 export async function executeCommandを処理(
   params: ExecuteCommandRequest["params"],
 ): Promise<ExecuteCommandResult> {
-  const args = params.args ?? [];
+  const args = (params.args ?? []).map(引数のUri文字列を変換);
   const result = await vscode.commands.executeCommand(params.commandId, ...args);
   return {
     result: JSONシリアライズ可能化(result),
     resultType: 型名(result),
   };
+}
+
+// MCP 経由では vscode.Uri オブジェクトを渡せないため、
+// "file:///..." 等のスキーム付き文字列を vscode.Uri に自動変換する
+function 引数のUri文字列を変換(arg: unknown): unknown {
+  if (typeof arg !== "string") return arg;
+  if (/^[a-zA-Z][\w+.-]*:\/\//.test(arg)) return vscode.Uri.parse(arg);
+  return arg;
 }
 
 function 型名(v: unknown): string {

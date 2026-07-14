@@ -108,10 +108,16 @@ export type RenameFileRequest = {
   };
 };
 
+export type GoToDefinitionRequest = {
+  method: "goToDefinition";
+  params: 位置 & { openFile?: boolean };
+};
+
 export type Request =
   | RenameSymbolRequest
   | FindSymbolRequest
   | FindReferencingSymbolsRequest
+  | GoToDefinitionRequest
   | PingRequest
   | GetDiagnosticsRequest
   | ListCommandsRequest
@@ -237,10 +243,15 @@ export type RenameFileResult = {
   warnings: string[];
 };
 
+export type GoToDefinitionResult = {
+  definitions: 参照情報[];
+};
+
 export type ResultMap = {
   renameSymbol: RenameSymbolResult;
   findSymbol: FindSymbolResult;
   findReferencingSymbols: FindReferencingSymbolsResult;
+  goToDefinition: GoToDefinitionResult;
   ping: PingResult;
   getDiagnostics: GetDiagnosticsResult;
   listCommands: ListCommandsResult;
@@ -253,18 +264,23 @@ export type ResultMap = {
 
 // ===== JSON-RPC 風エンベロープ =====
 
-export type RpcRequest<R extends Request = Request> = {
-  jsonrpc: "2.0";
-  id: string;
-  method: R["method"];
-  params: R["params"];
-};
+export type RpcRequest<R extends Request = Request> = R extends Request
+  ? {
+      jsonrpc: "2.0";
+      id: string;
+      method: R["method"];
+      params: R["params"];
+    }
+  : never;
 
-export type RpcSuccess<M extends Request["method"]> = {
-  jsonrpc: "2.0";
-  id: string;
-  result: ResultMap[M];
-};
+export type RpcSuccess<M extends Request["method"]> =
+  M extends Request["method"]
+    ? {
+        jsonrpc: "2.0";
+        id: string;
+        result: ResultMap[M];
+      }
+    : never;
 
 export type RpcError = {
   jsonrpc: "2.0";
